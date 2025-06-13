@@ -218,31 +218,56 @@ def submit_data():
             support_dl_QA, support_dl_ot_mh_QA, support_dl_ot_cost_QA
         )
         cur.execute(query, values)
-        # Update ttl_cost_model_wise for all rows with same customer and model
-        update_model_cost_query = f"""
-            UPDATE {table_name} AS t1
-            JOIN (
-                SELECT customer, model, SUM(dl_ot_cost + support_dl_ot_cost) AS total_model_cost
+        # --- Reset ttl_cost_model_wise to 0 for older rows ---
+        cur.execute(f"""
+            UPDATE {table_name} t1
+            INNER JOIN (
+                SELECT customer, model, MAX(id) AS max_id
                 FROM {table_name}
                 GROUP BY customer, model
-            ) AS t2 ON t1.customer = t2.customer AND t1.model = t2.model
-            SET t1.ttl_cost_model_wise = t2.total_model_cost
-        """
-        cur.execute(update_model_cost_query)
+            ) t2 ON t1.customer = t2.customer AND t1.model = t2.model
+            SET t1.ttl_cost_model_wise = 0
+            WHERE t1.id != t2.max_id
+        """)
         mysql.connection.commit()
 
+        # --- Set correct total only in latest row per customer+model ---
+        cur.execute(f"""
+            UPDATE {table_name} t1
+            INNER JOIN (
+                SELECT customer, model, MAX(id) AS max_id,
+                    SUM(dl_ot_cost + support_dl_ot_cost) AS total_model_cost
+                FROM {table_name}
+                GROUP BY customer, model
+            ) t2 ON t1.id = t2.max_id
+            SET t1.ttl_cost_model_wise = t2.total_model_cost
+        """)
         mysql.connection.commit()
-        # Update ttl_cost_customer_wise for all rows of the same customer
-        update_customer_cost_query = f"""
-            UPDATE {table_name} AS t1
-            JOIN (
-                SELECT customer, SUM(ttl_cost_model_wise) AS total_cost
+
+        # --- Reset ttl_cost_customer_wise to 0 for older rows ---
+        cur.execute(f"""
+            UPDATE {table_name} t1
+            INNER JOIN (
+                SELECT customer, MAX(id) AS max_id
                 FROM {table_name}
                 GROUP BY customer
-            ) AS t2 ON t1.customer = t2.customer
+            ) t2 ON t1.customer = t2.customer
+            SET t1.ttl_cost_customer_wise = 0
+            WHERE t1.id != t2.max_id
+        """)
+        mysql.connection.commit()
+
+        # --- Set correct total only in latest row per customer ---
+        cur.execute(f"""
+            UPDATE {table_name} t1
+            INNER JOIN (
+                SELECT customer, MAX(id) AS max_id,
+                    SUM(ttl_cost_model_wise) AS total_cost
+                FROM {table_name}
+                GROUP BY customer
+            ) t2 ON t1.id = t2.max_id
             SET t1.ttl_cost_customer_wise = t2.total_cost
-        """
-        cur.execute(update_customer_cost_query)
+        """)
         mysql.connection.commit()
 
         cur.close()
