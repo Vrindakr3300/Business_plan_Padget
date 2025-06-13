@@ -218,7 +218,33 @@ def submit_data():
             support_dl_QA, support_dl_ot_mh_QA, support_dl_ot_cost_QA
         )
         cur.execute(query, values)
+        # Update ttl_cost_model_wise for all rows with same customer and model
+        update_model_cost_query = f"""
+            UPDATE {table_name} AS t1
+            JOIN (
+                SELECT customer, model, SUM(dl_ot_cost + support_dl_ot_cost) AS total_model_cost
+                FROM {table_name}
+                GROUP BY customer, model
+            ) AS t2 ON t1.customer = t2.customer AND t1.model = t2.model
+            SET t1.ttl_cost_model_wise = t2.total_model_cost
+        """
+        cur.execute(update_model_cost_query)
         mysql.connection.commit()
+
+        mysql.connection.commit()
+        # Update ttl_cost_customer_wise for all rows of the same customer
+        update_customer_cost_query = f"""
+            UPDATE {table_name} AS t1
+            JOIN (
+                SELECT customer, SUM(ttl_cost_model_wise) AS total_cost
+                FROM {table_name}
+                GROUP BY customer
+            ) AS t2 ON t1.customer = t2.customer
+            SET t1.ttl_cost_customer_wise = t2.total_cost
+        """
+        cur.execute(update_customer_cost_query)
+        mysql.connection.commit()
+
         cur.close()
 
         return jsonify({'message': 'Data submitted and calculated successfully'}), 200
