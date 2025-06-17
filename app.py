@@ -231,17 +231,39 @@ def submit_data():
         """)
         mysql.connection.commit()
 
-        # --- Set correct total only in latest row per customer+model ---
+        # # --- Set correct total only in latest row per customer+model ---
+        # cur.execute(f"""
+        #     UPDATE {table_name} t1
+        #     INNER JOIN (
+        #         SELECT customer, model, MAX(id) AS max_id,
+        #             SUM(dl_ot_cost + support_dl_ot_cost) AS total_model_cost
+        #         FROM {table_name}
+        #         GROUP BY customer, model
+        #     ) t2 ON t1.id = t2.max_id
+        #     SET t1.ttl_cost_model_wise = t2.total_model_cost
+        # """)
+        # mysql.connection.commit()
+
+        # First reset all values in ttl_cost_model_wise to 0
+        cur.execute(f"UPDATE {table_name} SET ttl_cost_model_wise = 0")
+
+        # Now update only the latest row for each customer-model with the correct total
         cur.execute(f"""
             UPDATE {table_name} t1
-            INNER JOIN (
-                SELECT customer, model, MAX(id) AS max_id,
-                    SUM(dl_ot_cost + support_dl_ot_cost) AS total_model_cost
+            JOIN (
+                SELECT MAX(id) AS max_id, customer, model
                 FROM {table_name}
                 GROUP BY customer, model
-            ) t2 ON t1.id = t2.max_id
-            SET t1.ttl_cost_model_wise = t2.total_model_cost
+            ) latest
+            ON t1.id = latest.max_id
+            JOIN (
+                SELECT customer, model, ROUND(SUM(dl_ot_cost + support_dl_ot_cost), 2) AS total_cost
+                FROM {table_name}
+                GROUP BY customer, model
+            ) totals ON latest.customer = totals.customer AND latest.model = totals.model
+            SET t1.ttl_cost_model_wise = totals.total_cost
         """)
+
         mysql.connection.commit()
 
         # --- Reset ttl_cost_customer_wise to 0 for older rows ---
@@ -298,119 +320,128 @@ def format_export_dataframe(df):
     df = df.fillna("-")
     return df
 
-@app.route('/download-excel', methods=['GET'])
-def download_excel():
-    try:
-        global last_used_table
-        print(f"Last used table: {last_used_table}")  
+@app.route('/download-excel-by-selection', methods=['GET'])
+def download_excel_by_selection():
+    from flask import request, send_file
+    import pandas as pd
+    from io import BytesIO
 
-        allowed_tables = {
-            "sector68_fatp", "sector68_smt", "sector63_all",
-            "sector58_cfc", "sector58_fat", "sector60_be",
-            "sector60_fatp", "sector60_smt"
+    sector = request.args.get('sector')
+    subsector = request.args.get('subsector')
+
+    table_map = {
+        "Sector 68": {
+            "FATP": "sector68_fatp",
+            "SMT": "sector68_smt",
+            "SMT - BLT": "sector68_smt"
+        },
+        "Sector 63": {
+            "All Sections": "sector63_all"
+        },
+        "Sector 58": {
+            "FAT": "sector58_fat",
+            "CFC": "sector58_cfc"
+        },
+        "Sector 60": {
+            "BE": "sector60_be",
+            "SMT": "sector60_smt",
+            "CFC": "sector60_cfc"
         }
+    }
 
-        if last_used_table is None or last_used_table not in allowed_tables:
-            return jsonify({"error": "No Sector data submitted yet."}), 400
+    try:
+        table_name = table_map[sector][subsector]
+    except KeyError:
+        return jsonify({"error": "Invalid sector or subsector"}), 400
 
-
-        conn = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='@vrindakr051204',
-            database='business_plan'
-        )
-        print("Database connection established.")  
-        cursor = conn.cursor()
-        query = f"SELECT * FROM {last_used_table}"
-        print(f"Executing query: {query}")  
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        print(f"Rows fetched: {rows}")  
-
-        if not rows:
-            return jsonify({"error": "No data found in the table."}), 404
-
-        columns = [desc[0] for desc in cursor.description]
-        cursor.close()
-        conn.close()
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute(f"SELECT * FROM {table_name}")
+        rows = cur.fetchall()
+        columns = [col[0] for col in cur.description]
+        cur.close()
 
         df = pd.DataFrame(rows, columns=columns)
-        print(f"DataFrame created with shape: {df.shape}")  
-
-       
         if df.empty:
-            return jsonify({"error": "DataFrame is empty, no data to download."}), 404
-
-        df[['dl_ot_cost', 'support_dl_ot_cost']] = df.groupby(['customer', 'model'])[['dl_ot_cost', 'support_dl_ot_cost']].transform('sum')
-
-        df.sort_values(by=["customer", "model","section"], inplace=True)
+            return jsonify({"error": "No data found."}), 404
 
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False, sheet_name='Data', startrow=1, header=False)
-            workbook = writer.book
-            worksheet = writer.sheets['Data']
+            df.to_excel(writer, sheet_name='Data', index=False)
+            writer.book.add_worksheet('Chart')  # Optional blank chart sheet
 
-            
-            header_format = workbook.add_format({'bold': True, 'bg_color': '#D9E1F2'})
-            for col_num, value in enumerate(df.columns.values):
-                worksheet.write(0, col_num, value, header_format)
+        output.seek(0)
+        return send_file(
+            output,
+            download_name=f"{table_name}_data.xlsx",
+            as_attachment=True,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-            
-            current_customer = None
-            start_row = 1
-            for row in range(1, len(df) + 1):
-                customer = df.iloc[row - 1]['customer']
-                if customer != current_customer:
-                    if current_customer is not None:
-                        worksheet.merge_range(start_row, 0, row - 1, 0, current_customer)
-                    current_customer = customer
-                    start_row = row
-            if current_customer is not None:
-                worksheet.merge_range(start_row, 0, len(df), 0, current_customer)
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"error": "Failed to generate Excel"}), 500
+    
+@app.route('/download-sector-subsector', methods=['POST'])
+def download_sector_subsector_excel():
+    try:
+        sector = request.form.get('sector')
+        subsector = request.form.get('subsector')
 
+        if not sector or not subsector:
+            return jsonify({"error": "Missing sector or subsector"}), 400
+
+        # Determine the correct table name
+        if sector == "Sector 68":
+            if subsector.upper() == "FATP":
+                table_name = "sector68_fatp"
+            elif subsector.upper() in ["SMT", "SMT - BLT"]:
+                table_name = "sector68_smt"
+            else:
+                return jsonify({"error": "Invalid subsector for Sector 68"}), 400
+        elif sector == "Sector 63":
+            table_name = "sector63_all"
+        elif sector == "Sector 58":
+            table_name = "sector58_cfc" if subsector.upper() == "CFC" else "sector58_fat"
+        elif sector == "Sector 60":
+            if subsector.upper() == "BE":
+                table_name = "sector60_be"
+            elif subsector.upper() == "SMT":
+                table_name = "sector60_smt"
+            else:
+                table_name = "sector60_cfc"
+        else:
+            return jsonify({"error": "Unsupported sector"}), 400
+
+        cur = mysql.connection.cursor()
+        cur.execute(f"SELECT * FROM {table_name}")
+        rows = cur.fetchall()
+        if not rows:
+            return jsonify({"error": "No data found in the table."}), 404
+        columns = [desc[0] for desc in cur.description]
+        cur.close()
+
+
+        df = pd.DataFrame(rows, columns=columns)
+        df.sort_values(by=["customer", "model", "section"], inplace=True)
+
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Data')
             for i, col in enumerate(df.columns):
-                max_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
-                worksheet.set_column(i, i, max_len)
+                width = max(len(str(col)), df[col].astype(str).map(len).max()) + 2
+                writer.sheets['Data'].set_column(i, i, width)
 
         output.seek(0)
         return send_file(
             output,
             as_attachment=True,
-            download_name=f"{last_used_table}_export.xlsx",
+            download_name=f"{table_name}_sector_export.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
     except Exception as e:
-        print(f"Error: {str(e)}")  
+        print(f"Download error: {str(e)}")
         return jsonify({"error": str(e)}), 500
-
-@app.route('/download', methods=['GET'])
-def download_excel_raw():
-    global last_used_table
-    if not last_used_table:
-        return jsonify({'error': 'No data to export'}), 400
-
-    import mysql.connector
-    conn = mysql.connector.connect(
-        host='localhost',
-        user='root',
-        password='@vrindakr051204',
-        database='business_plan'
-    )
-
-    query = f"SELECT * FROM {last_used_table}"
-    df = pd.read_sql(query, conn)
-    conn.close()
-    df = df.sort_values(by=['customer', 'model',"section"])
-
-    output = BytesIO()
-    df.to_excel(output, index=False)
-    output.seek(0)
-
-    return send_file(output, download_name=f'{last_used_table}_export.xlsx', as_attachment=True)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
