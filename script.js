@@ -624,35 +624,50 @@ const specialSector60CFC = {
     sectorSection.classList.remove('hidden');
   });
 
-  document.addEventListener("DOMContentLoaded", () => {
-  const downloadBtn = document.getElementById("download-btn");
+const topDownloadBtn = document.getElementById("top-download-btn");
+const downloadSection = document.getElementById("download-section");
+const sectorDropdown = document.getElementById("sector");
+const subsectorDropdown = document.getElementById("subsector");
 
-  if (downloadBtn) {
-    downloadBtn.addEventListener("click", () => {
-      fetch("http://127.0.0.1:5000/download")
-        .then(response => {
-          if (!response.ok) throw new Error("Network response was not ok");
-          return response.blob().then(blob => ({ blob, response }));
-        })
-        .then(({ blob, response }) => {
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
+const subsectorMap = {
+  "Sector 58": ["FAT", "CFC"],
+  "Sector 60": ["BE", "SMT", "CFC"],
+  "Sector 63": ["All Sections"],
+  "Sector 68": ["FATP", "SMT"]
+};
 
-          const contentDisposition = response.headers.get("Content-Disposition");
-          const match = contentDisposition && contentDisposition.match(/filename="(.+)"/);
-          a.download = match ? match[1] : "export.xlsx";  // dynamic filename fallback
+topDownloadBtn.addEventListener("click", (e) => {
+  e.preventDefault();
+  document.querySelectorAll("main > section").forEach(sec => sec.classList.add("hidden"));
+  downloadSection.classList.remove("hidden");
+});
 
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-        })
-        .catch(err => {
-          console.error("Download failed:", err);
-          alert("Failed to download the file.");
-        });
+sectorDropdown.addEventListener("change", () => {
+  const selected = sectorDropdown.value;
+  subsectorDropdown.innerHTML = '<option value="">Select Subsector</option>';
+  if (selected in subsectorMap) {
+    subsectorMap[selected].forEach(sub => {
+      const opt = document.createElement("option");
+      opt.value = sub;
+      opt.textContent = sub;
+      subsectorDropdown.appendChild(opt);
     });
+    subsectorDropdown.disabled = false;
+  } else {
+    subsectorDropdown.disabled = true;
   }
 });
+
+document.getElementById("download-form").addEventListener("submit", (e) => {
+  const sector = sectorDropdown.value;
+  const subsector = subsectorDropdown.value;
+
+  if (!sector || !subsector) {
+    e.preventDefault();
+    alert("Please select both sector and subsector.");
+  }
+  // Let the form naturally submit via POST to /download-sector-subsector
+});
+
 
 })();
