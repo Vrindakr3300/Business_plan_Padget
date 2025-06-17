@@ -7,7 +7,15 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header><img src="logo.png" alt="Logo" />Business Plan</header>
+<header>
+  <div class="header-left">
+    <img src="logo.png" alt="Logo" />
+    <span class="title">BUSINESS PLAN</span>
+  </div>
+  <a id="top-download-btn" class="persistent-download-btn" href="#">Download</a>
+</header>
+
+
   <main>
   
     <section id="login-section">
@@ -77,8 +85,29 @@
       <h2>Summary</h2>
       <div class="summary" id="summary-content"></div>
       <button id="new-entry-btn" style="margin-left:10px;">Enter New Data</button>
-      <button id="download-btn" style="margin-left:10px;">Download Excel</button>
     </section>
+
+    <section id="download-section" class="hidden">
+  <h2>Download Sector/Subsector Data</h2>
+  <form id="download-form" action="http://127.0.0.1:5000/download-sector-subsector" method="POST">
+    <label for="sector">Sector</label>
+    <select id="sector" name="sector" required>
+      <option value="">Select Sector</option>
+      <option value="Sector 68">Sector 68</option>
+      <option value="Sector 63">Sector 63</option>
+      <option value="Sector 58">Sector 58</option>
+      <option value="Sector 60">Sector 60</option>
+    </select>
+
+    <label for="subsector">Subsector</label>
+    <select id="subsector" name="subsector" required disabled>
+      <option value="">Select Subsector</option>
+    </select>
+
+    <button type="submit">Download Excel</button>
+  </form>
+</section>
+
   </main>
 
   <footer class="footer">&copy; 2025 OT Data Collection, Padget.</footer>
