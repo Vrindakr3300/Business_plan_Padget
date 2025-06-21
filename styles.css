@@ -170,3 +170,17 @@ input[type="text"], input[type="number"], input[type="password"], select {
 .error {
     background-color: #f44336; 
 }
+
+.top-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin: 20px;
+  margin-bottom: 40px; 
+}
+
+#admin-panel button {
+  margin-bottom: 2rem;
+}
+
+
