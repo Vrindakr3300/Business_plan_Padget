@@ -170,8 +170,7 @@ def submit_data():
             )
         opr_loss_cost = working_hours_OT * (std_mp + support_dl) * per_hour_OT_cost * rqd_day_opr_loss * line_roundup
 
-        ttl_cost_model_wise = dl_ot_cost + support_dl_ot_cost 
-
+        ttl_cost_model_wise = 0
         ttl_cost_customer_wise = 0
 
         normal_wh = (working_days * working_hours * crew * std_mp) + (working_days * working_hours * support_dl * crew)
@@ -248,20 +247,22 @@ def submit_data():
         cur.execute(f"UPDATE {table_name} SET ttl_cost_model_wise = 0")
 
         # Now update only the latest row for each customer-model with the correct total
+        # Update only the latest row for each customer-model with the correct total
         cur.execute(f"""
             UPDATE {table_name} t1
             JOIN (
-                SELECT MAX(id) AS max_id, customer, model
-                FROM {table_name}
-                GROUP BY customer, model
+            SELECT MAX(id) AS max_id, customer, model
+            FROM {table_name}
+            GROUP BY customer, model
             ) latest
             ON t1.id = latest.max_id
             JOIN (
-                SELECT customer, model, ROUND(SUM(dl_ot_cost + support_dl_ot_cost), 2) AS total_cost
-                FROM {table_name}
-                GROUP BY customer, model
+            SELECT customer, model, SUM(dl_ot_cost + support_dl_ot_cost) AS total_cost
+            FROM {table_name}
+            GROUP BY customer, model
             ) totals ON latest.customer = totals.customer AND latest.model = totals.model
             SET t1.ttl_cost_model_wise = totals.total_cost
+            WHERE t1.ttl_cost_model_wise != totals.total_cost
         """)
 
         mysql.connection.commit()
@@ -442,6 +443,127 @@ def download_sector_subsector_excel():
     except Exception as e:
         print(f"Download error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id, password, role FROM users WHERE username=%s", (username,))
+    user = cur.fetchone()
+    cur.close()
+
+    if user and password == user[1]:  # Hash check recommended
+        return jsonify({"status": "success", "role": user[2]})
+    else:
+        return jsonify({"status": "fail", "message": "Invalid credentials"}), 401
+
+@app.route('/admin/add-sector', methods=['POST'])
+def add_sector():
+    data = request.get_json()
+    name = data.get('name')
+    cur = mysql.connection.cursor()
+    cur.execute("INSERT INTO sectors (name) VALUES (%s)", (name,))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({"message": "Sector added"}), 201
+@app.route('/admin/add-subsector', methods=['POST'])
+def add_subsector():
+    data = request.get_json()
+    name = data.get('name')
+    sector_name = data.get('sector')
+
+    cur = mysql.connection.cursor()
+
+    # Fetch sector_id from sector name
+    cur.execute("SELECT id FROM sectors WHERE name = %s", (sector_name,))
+    result = cur.fetchone()
+    if not result:
+        cur.close()
+        return jsonify({"error": f"Sector '{sector_name}' not found"}), 404
+
+    sector_id = result[0]
+
+    # Insert new subsector
+    cur.execute("INSERT INTO subsectors (name, sector_id) VALUES (%s, %s)", (name, sector_id))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({"message": f"Subsector '{name}' added under sector '{sector_name}'"}), 201
+@app.route('/admin/add-customer', methods=['POST'])
+def add_customer():
+    data = request.get_json()
+    name = data.get('name')
+
+    cur = mysql.connection.cursor()
+    cur.execute("INSERT INTO customers (name) VALUES (%s)", (name,))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({"message": f"Customer '{name}' added successfully."}), 201
+@app.route('/admin/add-model', methods=['POST'])
+def add_model():
+    data = request.get_json()
+    name = data.get('name')
+    customer_name = data.get('customer')
+
+    cur = mysql.connection.cursor()
+
+    # Get customer ID
+    cur.execute("SELECT id FROM customers WHERE name = %s", (customer_name,))
+    result = cur.fetchone()
+    if not result:
+        cur.close()
+        return jsonify({"error": f"Customer '{customer_name}' not found"}), 404
+
+    customer_id = result[0]
+
+    # Insert new model
+    cur.execute("INSERT INTO models (name, customer_id) VALUES (%s, %s)", (name, customer_id))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({"message": f"Model '{name}' added for customer '{customer_name}'."}), 201
+@app.route('/admin/add-section', methods=['POST'])
+def add_section():
+    data = request.get_json()
+    name = data.get('name')
+
+    cur = mysql.connection.cursor()
+    cur.execute("INSERT INTO sections (name) VALUES (%s)", (name,))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({"message": f"Section '{name}' added successfully."}), 201
+
+@app.route('/get-categories', methods=['GET'])
+def get_categories():
+    cur = mysql.connection.cursor()
+
+    # Fetch sector and subsector mapping
+    cur.execute("SELECT s.name, ss.name FROM sectors s JOIN subsectors ss ON s.id = ss.sector_id")
+    sector_data = cur.fetchall()
+    sector_map = {}
+    for sector, subsector in sector_data:
+        sector_map.setdefault(sector, []).append(subsector)
+
+    # Fetch customers and their models
+    cur.execute("SELECT id, name FROM customers")
+    customers = cur.fetchall()
+    customer_map = {}
+    for cid, name in customers:
+        cur.execute("SELECT name FROM models WHERE customer_id = %s", (cid,))
+        models = [row[0] for row in cur.fetchall()]
+        customer_map[name] = models
+
+    # Fetch sections
+    cur.execute("SELECT name FROM sections")
+    sections = [row[0] for row in cur.fetchall()]
+
+    cur.close()
+    return jsonify({
+        "sectors": sector_map,
+        "customers": customer_map,
+        "sections": sections
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)
