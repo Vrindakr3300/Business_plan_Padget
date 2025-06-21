@@ -254,87 +254,7 @@
   };
 
 
-  const subsectorsBySector = {
-    "Sector 58": ["FAT", "CFC"],
-    "Sector 60": ["BE", "SMT", "FATP"],
-    "Sector 63": ["All Sections"],
-    "Sector 68": ["FATP", "SMT"]
-  };
-
-  const customersData = {
-    "JIO": { models: ["JIO"], sections: ["FA", "Packing"] },
-    "Compal": { models: ["AK3/TG4"], sections: ["CG", "FAT", "CFC"] },
-    "Xiaomi": { models: ["C3F2P", "C3F", "C3FP", "C3Z"], sections: ["LDA", "Assy", "Testing", "Packing"] },
-    "Acer": { models: ["Acer"], sections: ["FATP"] },
-    "Lenovo": { models: ["Lenovo"], sections: ["FAT", "CFC"] }
-  };
-
-  const specialSector68SMT = {
-  "Moto": {
-    models: ["MB", "SB"],
-    sections: ["SMT"]
-  },
-  "Compal": {
-    models: ["AK3"],
-    sections: ["SMT"]
-  },
-  "Xiaomi": {
-    models: ["C3F2P", "C3FP", "C3Z", "All Models"],
-    sections: ["SMT", "SMT - BLT"]
-  },
-  "Lenovo": {
-    models: ["Lenovo"],
-    sections: ["SMT"]
-  },
-  "Oppo": {
-    models: [""],
-    sections: ["SMT"]
-  }
-};
-
-const specialSector63 = {
-  "LC": {
-    models:["Barley","RADO","AL5"],
-    sections: ["SMT MB", "SMT SB","SMT FB","BLT MB","Glue MB","Glue SB","FA","Packing"]
-  },
-  "Alcatel": {
-    models: ["Alcatel"],
-    sections: ["SMT MB", "SMT SB","SMT FB","BLT MB","Glue MB","Glue SB","FA","Packing"]
-  },
-};
-
-const specialSector58FAT = {
-  "Moto": {
-    models:["Cusco +","MALMO24","LAMULITE24","EXPLORER25","Kansas25 NA"],
-    sections: ["BE"]
-  },
-};
-
-const specialSector58CFC = {
-  "Moto": {
-    models:["Cusco +","MALMO24","LAMULITE24","EXPLORER25","Kansas25 NA"],
-    sections: ["CFC"]
-  },
-};
-const specialSector60BE = {
-  "Moto": {
-    models:["Poplar LTE","HOUSTON25","MANILA24","Milos","Cancun 5G+","Poplar Wifi","FOGO 5G+","Macan5G","VIENNA24","WEBB25","Milos +","EXPLORER25","BOSTON NA","MANAUS5G NA","CANCUN 5G NA","FOGO 5G NA","Glory NA","VEGAS25","Kansas25 NA","Prado NA","WEBB NA","Houston NA"],
-    sections: ["BE"]
-  },
-};
-const specialSector60SMT = {
-  "Moto": {
-    models:["Poplar LTE","Poplar Wifi","LAMULITE24","WEBB25","BOSTON NA","MANAUS5G NA","CANCUN 5G NA","Glory NA","Prado NA","WEBB NA","Houston NA"],
-    sections: ["MB","SB"]
-  },
-};
-const specialSector60CFC = {
-  "Moto": {
-    models:["BOSTON NA","MANAUS5G NA","CANCUN 5G NA","FOGO 5G NA","Glory NA","Kansas25 NA","Prado NA","WEBB NA","Houston NA"],
-    sections: ["CFC"]
-  },
-};
-
+  
   // DOM Elements
   const loginSection = document.getElementById('login-section');
   const loginForm = document.getElementById('login-form');
@@ -362,6 +282,22 @@ const specialSector60CFC = {
   const messageDiv = document.getElementById('message');
 
   let currentSector, currentSubsector, currentCustomer, currentModel, currentUser;
+  
+  let fetchedSectors = {};
+let fetchedCustomers = {};
+let fetchedSections = [];
+
+async function loadCategoriesFromBackend() {
+  try {
+    const res = await fetch("http://127.0.0.1:5000/get-categories");
+    const data = await res.json();
+    fetchedSectors = data.sectors;
+    fetchedCustomers = data.customers;
+    fetchedSections = data.sections;
+  } catch (err) {
+    console.error("Failed to load categories:", err);
+  }
+}
 
   loginForm.addEventListener('submit', evt => {
     evt.preventDefault();
@@ -379,28 +315,30 @@ const specialSector60CFC = {
   });
 
   function populateSectorOptions() {
-    sectorSelect.innerHTML = '<option value="" disabled selected>Select a sector</option>';
-    Object.keys(subsectorsBySector).forEach(sector => {
-      const opt = document.createElement('option');
-      opt.value = sector;
-      opt.textContent = sector;
-      sectorSelect.appendChild(opt);
-    });
-    subsectorSelect.innerHTML = '<option value="" disabled selected>Select a subsector</option>';
-    subsectorSelect.disabled = true;
-  }
+  sectorSelect.innerHTML = '<option value="" disabled selected>Select a sector</option>';
+  Object.keys(fetchedSectors).forEach(sector => {
+    const opt = document.createElement('option');
+    opt.value = sector;
+    opt.textContent = sector;
+    sectorSelect.appendChild(opt);
+  });
+
+  subsectorSelect.innerHTML = '<option value="" disabled selected>Select a subsector</option>';
+  subsectorSelect.disabled = true;
+}
 
   sectorSelect.addEventListener('change', () => {
-    const sector = sectorSelect.value;
-    subsectorSelect.disabled = false;
-    subsectorSelect.innerHTML = '<option value="" disabled selected>Select a subsector</option>';
-    subsectorsBySector[sector].forEach(sub => {
-      const opt = document.createElement('option');
-      opt.value = sub;
-      opt.textContent = sub;
-      subsectorSelect.appendChild(opt);
-    });
+  const sector = sectorSelect.value;
+  subsectorSelect.disabled = false;
+  subsectorSelect.innerHTML = '<option value="" disabled selected>Select a subsector</option>';
+  (fetchedSectors[sector] || []).forEach(sub => {
+    const opt = document.createElement('option');
+    opt.value = sub;
+    opt.textContent = sub;
+    subsectorSelect.appendChild(opt);
   });
+});
+
 
   sectorForm.addEventListener('submit', e => {
     e.preventDefault();
@@ -414,130 +352,41 @@ const specialSector60CFC = {
 
   function populateCustomerOptions() {
   customerSelect.innerHTML = '<option value="" disabled selected>Select a customer</option>';
-  modelSelect.innerHTML = '<option value="" disabled selected>Select a Model</option>';
-  sectionSelect.innerHTML = '<option value="" disabled selected>Select a Section</option>';
+  modelSelect.innerHTML = '<option value="" disabled selected>Select a model</option>';
+  sectionSelect.innerHTML = '<option value="" disabled selected>Select a section</option>';
   modelSelect.disabled = true;
-  sectionSelect.disabled = true;
+  sectionSelect.disabled = false;
 
-  if (currentSector === "Sector 68" && currentSubsector === "SMT") {
-    Object.keys(specialSector68SMT).forEach(cust => {
-      const opt = document.createElement('option');
-      opt.value = cust;
-      opt.textContent = cust;
-      customerSelect.appendChild(opt);
-    });
-  } 
-  else if (currentSector === "Sector 63" && currentSubsector === "All Sections") {
-    Object.keys(specialSector63).forEach(cust => {
-      const opt = document.createElement('option');
-      opt.value = cust;
-      opt.textContent = cust;
-      customerSelect.appendChild(opt);
-    });
-  }
-  else if (currentSector === "Sector 58" && currentSubsector === "FAT") {
-    Object.keys(specialSector58FAT).forEach(cust => {
-      const opt = document.createElement('option');
-      opt.value = cust;
-      opt.textContent = cust;
-      customerSelect.appendChild(opt);
-    });
-  }else if (currentSector === "Sector 58" && currentSubsector === "CFC") {
-    Object.keys(specialSector58CFC).forEach(cust => {
-      const opt = document.createElement('option');
-      opt.value = cust;
-      opt.textContent = cust;
-      customerSelect.appendChild(opt);
-    });
-  }else if (currentSector === "Sector 60" && currentSubsector === "BE") {
-    Object.keys(specialSector60BE).forEach(cust => {
-      const opt = document.createElement('option');
-      opt.value = cust;
-      opt.textContent = cust;
-      customerSelect.appendChild(opt);
-    });
-  }else if (currentSector === "Sector 60" && currentSubsector === "SMT") {
-    Object.keys(specialSector60SMT).forEach(cust => {
-      const opt = document.createElement('option');
-      opt.value = cust;
-      opt.textContent = cust;
-      customerSelect.appendChild(opt);
-    });
-  }else if (currentSector === "Sector 60" && currentSubsector === "CFC") {
-    Object.keys(specialSector60CFC).forEach(cust => {
-      const opt = document.createElement('option');
-      opt.value = cust;
-      opt.textContent = cust;
-      customerSelect.appendChild(opt);
-    });
-  }
-  else {
-    Object.keys(customersData).forEach(cust => {
-      const opt = document.createElement('option');
-      opt.value = cust;
-      opt.textContent = cust;
-      customerSelect.appendChild(opt);
-    });
-  }
+  Object.keys(fetchedCustomers).forEach(customer => {
+    const opt = document.createElement('option');
+    opt.value = customer;
+    opt.textContent = customer;
+    customerSelect.appendChild(opt);
+  });
+
+  // populate sections globally (not customer-specific)
+  fetchedSections.forEach(section => {
+    const opt = document.createElement('option');
+    opt.value = section;
+    opt.textContent = section;
+    sectionSelect.appendChild(opt);
+  });
 }
-
 
   customerSelect.addEventListener('change', () => {
   const customer = customerSelect.value;
   modelSelect.disabled = false;
-  modelSelect.innerHTML = '<option value="" disabled selected>Select a Model</option>';
-  sectionSelect.innerHTML = '<option value="" disabled selected>Select a Section</option>';
-  sectionSelect.disabled = false;
+  modelSelect.innerHTML = '<option value="" disabled selected>Select a model</option>';
 
-  let models = [], sections = [];
-
-  if (currentSector === "Sector 68" && currentSubsector === "SMT") {
-    models = specialSector68SMT[customer]?.models || [];
-    sections = specialSector68SMT[customer]?.sections || [];
-  } 
-  else if (currentSector === "Sector 63" && currentSubsector === "All Sections") {
-    models = specialSector63[customer]?.models || [];
-    sections = specialSector63[customer]?.sections || [];
-  }
-  else if (currentSector === "Sector 58" && currentSubsector === "FAT") {
-    models = specialSector58FAT[customer]?.models || [];
-    sections = specialSector58FAT[customer]?.sections || [];
-  }
-  else if (currentSector === "Sector 58" && currentSubsector === "CFC") {
-    models = specialSector58CFC[customer]?.models || [];
-    sections = specialSector58CFC[customer]?.sections || [];
-  }
-  else if (currentSector === "Sector 60" && currentSubsector === "BE") {
-    models = specialSector60BE[customer]?.models || [];
-    sections = specialSector60BE[customer]?.sections || [];
-  }
-  else if (currentSector === "Sector 60" && currentSubsector === "SMT") {
-    models = specialSector60SMT[customer]?.models || [];
-    sections = specialSector60SMT[customer]?.sections || [];
-  }
-  else if (currentSector === "Sector 60" && currentSubsector === "CFC") {
-    models = specialSector60CFC[customer]?.models || [];
-    sections = specialSector60CFC[customer]?.sections || [];
-  }
-  else {
-    models = customersData[customer]?.models || [];
-    sections = customersData[customer]?.sections || [];
-  }
-
+  const models = fetchedCustomers[customer] || [];
   models.forEach(model => {
     const opt = document.createElement('option');
     opt.value = model;
     opt.textContent = model;
     modelSelect.appendChild(opt);
   });
-
-  sections.forEach(section => {
-    const opt = document.createElement('option');
-    opt.value = section;
-    opt.textContent = section;
-    sectionSelect.appendChild(opt);
-  });
 });
+
 
   customerForm.addEventListener('submit', e => {
     e.preventDefault();
@@ -669,5 +518,98 @@ document.getElementById("download-form").addEventListener("submit", (e) => {
   // Let the form naturally submit via POST to /download-sector-subsector
 });
 
+document.getElementById('login-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+
+  const res = await fetch('http://127.0.0.1:5000/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ username, password })
+  });
+
+  const result = await res.json();
+  if (result.status === 'success') {
+  await loadCategoriesFromBackend();  // 👈 Load all dropdown data from backend
+
+  if (result.role === 'admin') {
+    document.getElementById('admin-panel').classList.remove('hidden');
+  } else {
+    document.getElementById('sector-section').classList.remove('hidden');
+    populateSectorOptions();  // 👈 Only after backend fetch
+  }
+  document.getElementById('login-section').classList.add('hidden');
+} else {
+  document.getElementById('login-error').innerText = result.message;
+}
+
+});
+
+async function sendAdminForm(endpoint, data, messageEl) {
+  try {
+    const res = await fetch(`http://127.0.0.1:5000/admin/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+    messageEl.textContent = result.message || "Added successfully!";
+  } catch (err) {
+    messageEl.textContent = "Error: " + err.message;
+  }
+}
+
+document.getElementById("add-sector-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const sector = e.target.sector.value.trim();
+  sendAdminForm("add-sector", { name: sector }, document.getElementById("admin-message"));
+  e.target.reset();
+});
+
+document.getElementById("add-subsector-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const subsector = e.target.subsector.value.trim();
+  const sector = e.target["sector-name"].value.trim();
+  sendAdminForm("add-subsector", { name: subsector, sector }, document.getElementById("admin-message"));
+  e.target.reset();
+});
+
+document.getElementById("add-customer-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const customer = e.target.customer.value.trim();
+  sendAdminForm("add-customer", { name: customer }, document.getElementById("admin-message"));
+  e.target.reset();
+});
+
+document.getElementById("add-model-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const model = e.target.model.value.trim();
+  const customer = e.target["customer-name"].value.trim();
+  sendAdminForm("add-model", { name: model, customer }, document.getElementById("admin-message"));
+  e.target.reset();
+});
+
+document.getElementById("add-section-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const section = e.target.section.value.trim();
+  sendAdminForm("add-section", { name: section }, document.getElementById("admin-message"));
+  e.target.reset();
+});
+
+document.getElementById("logout-btn").addEventListener("click", (e) => {
+  e.preventDefault();
+  // Hide all sections and return to login screen
+  document.querySelectorAll("main > section").forEach(sec => sec.classList.add("hidden"));
+  document.getElementById("login-section").classList.remove("hidden");
+  document.getElementById("login-form").reset();
+
+  // Clear any dynamic form fields or messages
+  document.getElementById("message").textContent = '';
+  document.getElementById("admin-message").textContent = '';
+});
+
 
 })();
+s
