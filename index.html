@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OT Data Collector</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <img src="logo.png" alt="Logo" />
+    <span class="title">BUSINESS PLAN</span>
+  </div>
+  <div class="top-buttons">
+  <a id="top-download-btn" href="#" class="persistent-download-btn">Download</a>
+  <a id="logout-btn" href="#" class="persistent-download-btn">Logout</a>
+</div>
+</header>
+  <main>
+    <section id="login-section">
+      <h2>Login</h2>
+      <form id="login-form" autocomplete="off">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required />
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required />
+        <button type="submit">Login</button>
+        <p class="error-msg" id="login-error" role="alert"></p>
+      </form>
+    </section>
+    <section id="sector-section" class="hidden">
+      <h2>Select Sector & Subsector</h2>
+      <form id="sector-form">
+        <label for="sector-select">Sector</label>
+        <select id="sector-select" name="sector-select" required>
+          <option value="" disabled selected>Select a sector</option>
+        </select>
+        <label for="subsector-select">Subsector</label>
+        <select id="subsector-select" name="subsector-select" required disabled>
+          <option value="" disabled selected>Select a subsector</option>
+        </select>
+        <button type="submit">Next</button>
+      </form>
+    </section>
+    <section id="customer-model-section" class="hidden">
+      <h2>Select Customer, Model and Section</h2>
+      <form id="customer-form">
+        <label for="customer-select">Customer</label>
+        <select id="customer-select" name="customer-select" required>
+          <option value="" disabled selected>Select a customer</option>
+        </select>
+        <label for="model-select">Model</label>
+        <select id="model-select" name="model-select" required disabled>
+          <option value="" disabled selected>Select a Model</option>
+        </select>
+        <label for="section-select">Section</label>
+        <select id="section-select" name="section" required disabled>
+          <option value="" disabled selected>Select a Section</option>
+        </select>
+        <button type="submit">Next</button>
+      </form>
+    </section>    
+    <section id="form-section" class="hidden">
+      <h2>Fill Data for <span id="selected-sector"></span> - <span id="selected-subsector"></span></h2>
+      <h3 style="font-size: 1.2rem; color: #eee;">Data of <span id="selected-customer"></span> - <span id="selected-model"></span> - <span id="selected-section"></span></h3>
+      <form id="data-form" autocomplete="off">
+        <div id="form-fields"></div>
+        <button type="submit">Submit Data</button>
+      </form>
+      <div id="message" class="message"></div>
+    </section>
+    <section id="summary-section" class="hidden">
+      <h2>Summary</h2>
+      <div class="summary" id="summary-content"></div>
+      <button id="new-entry-btn" style="margin-left:10px;">Enter New Data</button>
+    </section>
+    <section id="download-section" class="hidden">
+  <h2>Download Sector/Subsector Data</h2>
+  <form id="download-form" action="http://127.0.0.1:5000/download-sector-subsector" method="POST">
+    <label for="sector">Sector</label>
+    <select id="sector" name="sector" required>
+      <option value="">Select Sector</option>
+      <option value="Sector 68">Sector 68</option>
+      <option value="Sector 63">Sector 63</option>
+      <option value="Sector 58">Sector 58</option>
+      <option value="Sector 60">Sector 60</option>
+    </select>
+    <label for="subsector">Subsector</label>
+    <select id="subsector" name="subsector" required disabled>
+      <option value="">Select Subsector</option>
+    </select>
+    <button type="submit">Download Excel</button>
+  </form>
+</section>
+<section id="admin-panel" class="hidden">
+  <h2>Admin Panel</h2>
+  <form id="add-sector-form">
+    <input type="text" name="sector" placeholder="Enter new sector" required />
+    <button type="submit">Add Sector</button>
+  </form>
+  <form id="add-subsector-form">
+    <input type="text" name="subsector" placeholder="Enter new subsector" required />
+    <input type="text" name="sector-name" placeholder="Sector this belongs to" required />
+    <button type="submit">Add Subsector</button>
+  </form>
+  <form id="add-customer-form">
+    <input type="text" name="customer" placeholder="Enter new customer" required />
+    <button type="submit">Add Customer</button>
+  </form>
+  <form id="add-model-form">
+    <input type="text" name="model" placeholder="Enter new model" required />
+    <input type="text" name="customer-name" placeholder="Customer this belongs to" required />
+    <button type="submit">Add Model</button>
+  </form>
+  <form id="add-section-form">
+    <input type="text" name="section" placeholder="Enter new section" required />
+    <button type="submit">Add Section</button>
+  </form>
+  <div id="admin-message" style="margin-top: 10px; color: lightgreen;"></div>
+</section>
+  </main>
+  <footer class="footer">&copy; 2025 OT Data Collection, Padget.</footer>
+  <script src="script.js"></script>
+
+</body>
+</html>
