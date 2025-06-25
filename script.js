@@ -484,7 +484,7 @@ async function loadCategoriesFromBackend() {
 
 
 
-    fetch("http://127.0.0.1:5000/submit", {
+    fetch("https://businessplanpadget-production.up.railway.app/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -559,7 +559,7 @@ document.getElementById('login-form').addEventListener('submit', async function 
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
 
-  const res = await fetch('http://127.0.0.1:5000/login', {
+  const res = await fetch('https://businessplanpadget-production.up.railway.app/login', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ username, password })
@@ -584,7 +584,7 @@ document.getElementById('login-form').addEventListener('submit', async function 
 
 async function sendAdminForm(endpoint, data, messageEl) {
   try {
-    const res = await fetch(`http://127.0.0.1:5000/admin/${endpoint}`, {
+    const res = await fetch(`https://businessplanpadget-production.up.railway.app/admin/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
