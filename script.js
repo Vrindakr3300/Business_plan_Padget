@@ -325,7 +325,7 @@
 
 async function loadCategoriesFromBackend() {
   try {
-    const res = await fetch("http://127.0.0.1:5000/get-categories");
+    const res = await fetch("https://businessplanpadget-production.up.railway.app/get-categories");
     const data = await res.json();
     fetchedSectors = data.sectors;
     fetchedCustomers = data.customers;
