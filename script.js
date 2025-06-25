@@ -335,6 +335,18 @@ async function loadCategoriesFromBackend() {
   }
 }
 
+loginForm.addEventListener('submit', evt => {
+  evt.preventDefault();
+  const username = loginForm.username.value.trim();
+  const password = loginForm.password.value.trim();
+  if (username === "user" && password === "password123") {
+    loginForm.style.display = 'none';
+    formContainer.style.display = 'block';
+    document.getElementById('welcome-msg').textContent = `Welcome, ${username}!`;
+  } else {
+    loginError.textContent = 'Invalid username or password.';
+  }
+});
 
 
   function populateSectorOptions() {
