@@ -335,20 +335,7 @@ async function loadCategoriesFromBackend() {
   }
 }
 
-  loginForm.addEventListener('submit', evt => {
-    evt.preventDefault();
-    const username = loginForm.username.value.trim();
-    const password = loginForm.password.value.trim();
-    if (username === "user" && password === "password123") {
-      currentUser = username;
-      loginSection.classList.add('hidden');
-      sectorSection.classList.remove('hidden');
-      loginError.textContent = '';
-      populateSectorOptions();
-    } else {
-      loginError.textContent = 'Invalid username or password.';
-    }
-  });
+
 
   function populateSectorOptions() {
   sectorSelect.innerHTML = '<option value="" disabled selected>Select a sector</option>';
